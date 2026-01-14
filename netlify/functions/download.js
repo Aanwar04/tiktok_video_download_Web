@@ -1,14 +1,14 @@
 const axios = require('axios');
 
 // Method 1: tikwm.com API (Most reliable)
-async function downloadViaTikwm(videoUrl) {
+async function downloadViaTikwm(videoUrl, quality = 'hd') {
     try {
         console.log('🔄 Trying tikwm.com API...');
 
         const response = await axios.get('https://www.tikwm.com/api/', {
             params: {
                 url: videoUrl,
-                hd: 1
+                hd: quality === 'hd' ? 1 : 0
             },
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -186,7 +186,7 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { url } = JSON.parse(event.body);
+        const { url, quality = 'hd' } = JSON.parse(event.body);
 
         // Validate URL
         if (!url) {
@@ -224,7 +224,7 @@ exports.handler = async (event, context) => {
 
         // Try methods in order
         const methods = [
-            { name: 'tikwm', func: downloadViaTikwm },
+            { name: 'tikwm', func: (url) => downloadViaTikwm(url, quality) },
             { name: 'snaptik', func: downloadViaSnaptik },
             { name: 'tmate', func: downloadViaTmate }
         ];

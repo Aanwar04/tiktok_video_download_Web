@@ -289,6 +289,13 @@
                 </div>
             </div>
 
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Video Quality:</label>
+                <select id="qualitySelect" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px;">
+                    <option value="hd">HD Quality</option>
+                    <option value="normal">Normal Quality</option>
+                </select>
+            </div>
             <button class="btn-primary" id="downloadBtn">
                 <span id="btnText">Download Video</span>
                 <span id="btnLoader" class="loader hidden"></span>
@@ -365,7 +372,8 @@
 
         const elements = {
             videoUrl: document.getElementById('videoUrl'),
-            clearBtn: document.getElementById('clearBtn'),
+            clearBtn: document.getElementBy('clearBtn'),
+            qualitySelect: document.getElementById('qualitySelect'),
             downloadBtn: document.getElementById('downloadBtn'),
             btnText: document.getElementById('btnText'),
             btnLoader: document.getElementById('btnLoader'),
@@ -396,6 +404,7 @@
         // Download button handler
         elements.downloadBtn.addEventListener('click', async () => {
             const url = elements.videoUrl.value.trim();
+            const quality = elements.qualitySelect.value;
 
             // Clear previous messages
             elements.errorMsg.classList.add('hidden');
@@ -421,7 +430,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url })
+                    body: JSON.stringify({ url, quality })
                 });
 
                 const data = await response.json();
