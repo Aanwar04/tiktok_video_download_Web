@@ -284,7 +284,7 @@ exports.handler = async (event, context) => {
         for (const method of methods) {
             try {
                 const result = await method.func(url);
-                
+
                 // Check file size limits
                 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB limit
                 if (result.data.video.size && result.data.video.size > MAX_FILE_SIZE) {
@@ -300,7 +300,7 @@ exports.handler = async (event, context) => {
                         })
                     };
                 }
-                
+
                 console.log(`✅ Success with ${method.name}!\n`);
                 return {
                     statusCode: 200,
