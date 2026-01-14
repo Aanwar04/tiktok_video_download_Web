@@ -1,5 +1,24 @@
 const axios = require('axios');
 
+// Helper function to get resolution from quality
+function getResolutionFromQuality(quality) {
+    const resolutions = {
+        'sd': '480p',
+        'hd': '720p',
+        'fhd': '1080p',
+        '4k': '2160p'
+    };
+    return resolutions[quality] || '720p';
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return 'Unknown';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
 // Method 1: tikwm.com API (Most reliable)
 async function downloadViaTikwm(videoUrl, quality = 'hd') {
     try {
@@ -8,7 +27,7 @@ async function downloadViaTikwm(videoUrl, quality = 'hd') {
         const response = await axios.get('https://www.tikwm.com/api/', {
             params: {
                 url: videoUrl,
-                hd: quality === 'hd' ? 1 : 0
+                hd: hdParam
             },
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -31,7 +50,11 @@ async function downloadViaTikwm(videoUrl, quality = 'hd') {
                         noWatermark: data.hdplay || data.play || data.wmplay,
                         withWatermark: data.wmplay,
                         cover: data.cover || data.origin_cover,
-                        duration: data.duration || 0
+                        duration: data.duration || 0,
+                        size: data.size || 0,
+                        resolution: getResolutionFromQuality(quality),
+                        format: format.toUpperCase(),
+                        quality: quality
                     },
                     music: {
                         title: data.music || data.music_info?.title || 'Original Sound',
@@ -83,7 +106,11 @@ async function downloadViaSnaptik(videoUrl) {
                         noWatermark: response.data.url,
                         withWatermark: response.data.url,
                         cover: response.data.thumbnail || '',
-                        duration: 0
+                        duration: 0,
+                        size: 0,
+                        resolution: getResolutionFromQuality(quality),
+                        format: format.toUpperCase(),
+                        quality: quality
                     },
                     music: {
                         title: 'Original Sound',
@@ -134,7 +161,11 @@ async function downloadViaTmate(videoUrl) {
                         noWatermark: response.data.video_url,
                         withWatermark: response.data.video_url,
                         cover: response.data.thumbnail || '',
-                        duration: 0
+                        duration: 0,
+                        size: 0,
+                        resolution: getResolutionFromQuality(quality),
+                        format: format.toUpperCase(),
+                        quality: quality
                     },
                     music: {
                         title: response.data.music || 'Original Sound',
@@ -186,7 +217,26 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { url, quality = 'hd' } = JSON.parse(event.body);
+        const { url, quality = 'hd', format = 'mp4' } = JSON.parse(event.body);
+
+        // Map quality to API parameters
+        let hdParam = 0;
+        switch (quality) {
+            case 'sd':
+                hdParam = 0; // Standard definition
+                break;
+            case 'hd':
+                hdParam = 1; // High definition
+                break;
+            case 'fhd':
+                hdParam = 2; // Full HD (if supported)
+                break;
+            case '4k':
+                hdParam = 3; // 4K (if supported)
+                break;
+            default:
+                hdParam = 1; // Default to HD
+        }
 
         // Validate URL
         if (!url) {
@@ -234,6 +284,23 @@ exports.handler = async (event, context) => {
         for (const method of methods) {
             try {
                 const result = await method.func(url);
+                
+                // Check file size limits
+                const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB limit
+                if (result.data.video.size && result.data.video.size > MAX_FILE_SIZE) {
+                    return {
+                        statusCode: 400,
+                        headers: {
+                            'Access-Control-Allow-Origin': '*',
+                            'Access-Control-Allow-Headers': 'Content-Type'
+                        },
+                        body: JSON.stringify({
+                            success: false,
+                            error: `Video is too large (${formatFileSize(result.data.video.size)}). Maximum allowed size is ${formatFileSize(MAX_FILE_SIZE)}. Try a lower quality option.`
+                        })
+                    };
+                }
+                
                 console.log(`✅ Success with ${method.name}!\n`);
                 return {
                     statusCode: 200,
