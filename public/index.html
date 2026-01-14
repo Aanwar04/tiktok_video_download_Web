@@ -267,6 +267,20 @@
                 width: 100%;
                 height: auto;
             }
+
+            .video-info {
+                font-size: 0.8rem;
+            }
+
+            .video-info div {
+                grid-template-columns: 1fr;
+                gap: 5px;
+            }
+
+            .download-stats {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
         }
     </style>
 </head>
@@ -292,8 +306,18 @@
             <div style="margin-bottom: 15px;">
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Video Quality:</label>
                 <select id="qualitySelect" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px;">
-                    <option value="hd">HD Quality</option>
-                    <option value="normal">Normal Quality</option>
+                    <option value="sd">SD (480p) - Smaller file ~5-15MB</option>
+                    <option value="hd">HD (720p) - Balanced ~15-50MB</option>
+                    <option value="fhd">Full HD (1080p) - High quality ~50-150MB</option>
+                    <option value="4k">4K (2160p) - Maximum quality ~100-500MB</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Output Format:</label>
+                <select id="formatSelect" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px;">
+                    <option value="mp4">MP4 (Universal) - Best compatibility</option>
+                    <option value="webm">WebM (Smaller) - Modern browsers</option>
+                    <option value="avi">AVI (Legacy) - Older devices</option>
                 </select>
             </div>
             <button class="btn-primary" id="downloadBtn">
@@ -303,6 +327,9 @@
 
             <!-- Error Message -->
             <div id="errorMsg" class="alert alert-error hidden"></div>
+
+            <!-- Success Message -->
+            <div id="successMsg" class="alert alert-success hidden"></div>
 
             <!-- Result -->
             <div id="result" class="result hidden">
@@ -318,6 +345,18 @@
                         </div>
                     </div>
                 </div>
+                <div class="video-info" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0;">
+                    <h4 style="margin: 0 0 10px 0; color: #333; font-size: 1rem;">Video Details</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem;">
+                        <div>📐 <strong>Resolution:</strong> <span id="videoResolution">720p</span></div>
+                        <div>⏱️ <strong>Duration:</strong> <span id="videoDuration">00:30</span></div>
+                        <div>💾 <strong>File Size:</strong> <span id="videoSize">15.2 MB</span></div>
+                        <div>🎞️ <strong>Format:</strong> <span id="videoFormat">MP4</span></div>
+                    </div>
+                    <div id="sizeWarning" class="alert alert-error hidden" style="margin-top: 10px; padding: 8px; font-size: 0.8rem;">
+                        ⚠️ Large file detected! Download may take longer and use more data.
+                    </div>
+                </div>
                 <div class="download-buttons">
                     <button id="downloadVideo" class="btn-download">
                         📥 Download Video (No Watermark)
@@ -325,6 +364,17 @@
                     <button id="downloadAudio" class="btn-download">
                         🎵 Download Audio (MP3)
                     </button>
+                </div>
+                <div class="batch-download" style="margin-top: 15px; padding: 10px; background: #f0f8ff; border-radius: 8px; border: 1px solid #e0e0e0;">
+                    <button id="addToBatch" class="btn-secondary" style="width: 100%; margin-bottom: 10px;">➕ Add to Batch Download</button>
+                    <div id="batchList" style="display: none; margin-top: 10px;">
+                        <h4 style="margin: 0 0 10px 0; color: #333; font-size: 0.9rem;">Batch Queue (<span id="batchCount">0</span> videos)</h4>
+                        <div id="batchItems" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px;"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="downloadBatch" class="btn-primary" style="flex: 1; display: none;">📦 Download All</button>
+                            <button id="clearBatch" class="btn-secondary" style="flex: 1;">🗑️ Clear All</button>
+                        </div>
+                    </div>
                 </div>
                 <div id="downloadProgress" class="hidden" style="margin-top: 15px;">
                     <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden; height: 30px;">
@@ -365,6 +415,15 @@
                 </div>
             </div>
         </div>
+
+        <!-- Download Statistics -->
+        <div class="card" style="margin-top: 20px; text-align: center;">
+            <div class="download-stats" style="display: flex; justify-content: space-around; font-size: 0.9rem; color: #666;">
+                <div>📊 <strong>Today's Downloads:</strong> <span id="todayDownloads">0</span></div>
+                <div>✅ <strong>Success Rate:</strong> <span id="successRate">100%</span></div>
+                <div>💾 <strong>Total Size:</strong> <span id="totalSize">0 MB</span></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -374,6 +433,7 @@
             videoUrl: document.getElementById('videoUrl'),
             clearBtn: document.getElementBy('clearBtn'),
             qualitySelect: document.getElementById('qualitySelect'),
+            formatSelect: document.getElementById('formatSelect'),
             downloadBtn: document.getElementById('downloadBtn'),
             btnText: document.getElementById('btnText'),
             btnLoader: document.getElementById('btnLoader'),
@@ -393,6 +453,27 @@
         };
 
         let currentVideoData = null;
+        let batchQueue = [];
+
+        // Download statistics
+        let downloadStats = {
+            todayDownloads: 0,
+            successfulDownloads: 0,
+            totalSizeDownloaded: 0
+        };
+
+        // Load stats from localStorage
+        loadDownloadStats();
+
+        // Batch download elements
+        const batchElements = {
+            addToBatch: document.getElementById('addToBatch'),
+            batchList: document.getElementById('batchList'),
+            batchItems: document.getElementById('batchItems'),
+            batchCount: document.getElementById('batchCount'),
+            downloadBatch: document.getElementById('downloadBatch'),
+            clearBatch: document.getElementById('clearBatch')
+        };
 
         // Clear button handler
         elements.clearBtn.addEventListener('click', () => {
@@ -401,10 +482,26 @@
             elements.result.classList.add('hidden');
         });
 
+        // Batch download handlers
+        batchElements.addToBatch.addEventListener('click', () => {
+            if (currentVideoData) {
+                addToBatch(currentVideoData);
+            }
+        });
+
+        batchElements.downloadBatch.addEventListener('click', () => {
+            downloadBatch();
+        });
+
+        batchElements.clearBatch.addEventListener('click', () => {
+            clearBatch();
+        });
+
         // Download button handler
         elements.downloadBtn.addEventListener('click', async () => {
             const url = elements.videoUrl.value.trim();
             const quality = elements.qualitySelect.value;
+            const format = elements.formatSelect.value;
 
             // Clear previous messages
             elements.errorMsg.classList.add('hidden');
@@ -430,7 +527,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url, quality })
+                    body: JSON.stringify({ url, quality, format })
                 });
 
                 const data = await response.json();
@@ -460,8 +557,17 @@
         }
 
         function showError(message) {
-            elements.errorMsg.textContent = message;
+            elements.errorMsg.innerHTML = `
+                ${message}
+                <button id="retryBtn" style="margin-left: 10px; padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem;">🔄 Retry</button>
+            `;
             elements.errorMsg.classList.remove('hidden');
+
+            // Add retry functionality
+            document.getElementById('retryBtn').addEventListener('click', () => {
+                elements.errorMsg.classList.add('hidden');
+                elements.downloadBtn.click();
+            });
         }
 
         function displayResult(data) {
@@ -475,6 +581,25 @@
             elements.resultComments.textContent = formatNumber(data.statistics.comments);
             elements.resultShares.textContent = formatNumber(data.statistics.shares);
 
+            // Display video information
+            const resolution = data.video.resolution || getResolutionFromQuality(data.quality) || '720p';
+            const duration = data.video.duration ? formatDuration(data.video.duration) : '00:30';
+            const size = data.video.size ? formatFileSize(data.video.size) : '15.2 MB';
+            const format = data.video.format || 'MP4';
+
+            document.getElementById('videoResolution').textContent = resolution;
+            document.getElementById('videoDuration').textContent = duration;
+            document.getElementById('videoSize').textContent = size;
+            document.getElementById('videoFormat').textContent = format;
+
+            // Show warning for large files (>50MB)
+            const sizeWarning = document.getElementById('sizeWarning');
+            if (data.video.size && data.video.size > 50 * 1024 * 1024) {
+                sizeWarning.classList.remove('hidden');
+            } else {
+                sizeWarning.classList.add('hidden');
+            }
+
             elements.result.classList.remove('hidden');
             elements.downloadProgress.classList.add('hidden');
         }
@@ -484,10 +609,20 @@
             try {
                 elements.downloadProgress.classList.remove('hidden');
                 elements.progressBar.style.width = '0%';
-                elements.progressText.textContent = 'Starting download...';
+                elements.progressText.textContent = 'Preparing download...';
+
+                // For better UX, we'll use a simulated progress since direct download
+                // progress tracking is limited due to CORS
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 15;
+                    if (progress > 90) progress = 90;
+                    elements.progressBar.style.width = `${progress}%`;
+                    elements.progressText.textContent = `Downloading... ${Math.round(progress)}%`;
+                }, 500);
 
                 // Use our proxy to avoid CORS issues
-                const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+                const proxyUrl = `/.netlify/functions/proxy?url=${encodeURIComponent(url)}`;
 
                 // Create a hidden link and click it
                 const a = document.createElement('a');
@@ -496,21 +631,24 @@
                 a.style.display = 'none';
                 document.body.appendChild(a);
 
-                elements.progressBar.style.width = '100%';
-                elements.progressText.textContent = 'Downloading...';
-
-                a.click();
-
-                // Clean up
+                // Simulate completion
                 setTimeout(() => {
-                    document.body.removeChild(a);
+                    clearInterval(progressInterval);
                     elements.progressBar.style.width = '100%';
-                    elements.progressText.textContent = '✓ Complete!';
+                    elements.progressText.textContent = '✓ Download started! Check your downloads folder.';
+
+                    a.click();
+
+                    // Record successful download
+                    const sizeMB = currentVideoData?.video?.size ?
+                        currentVideoData.video.size / (1024 * 1024) : 15;
+                    recordSuccessfulDownload(sizeMB);
 
                     setTimeout(() => {
+                        document.body.removeChild(a);
                         elements.downloadProgress.classList.add('hidden');
-                    }, 2000);
-                }, 1000);
+                    }, 3000);
+                }, 2000);
 
             } catch (error) {
                 console.error('Download error:', error);
@@ -545,6 +683,159 @@
                 return (num / 1000).toFixed(1) + 'K';
             }
             return num.toString();
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds || seconds === 0) return '00:30';
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes || bytes === 0) return '15.2 MB';
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function getResolutionFromQuality(quality) {
+            const resolutions = {
+                'sd': '480p',
+                'hd': '720p',
+                'fhd': '1080p',
+                '4k': '2160p'
+            };
+            return resolutions[quality] || '720p';
+        }
+
+        // Batch download functions
+        function addToBatch(videoData) {
+            // Check if video is already in batch
+            const exists = batchQueue.some(item => item.video.noWatermark === videoData.video.noWatermark);
+            if (exists) {
+                showError('This video is already in your batch queue');
+                return;
+            }
+
+            batchQueue.push({...videoData});
+            updateBatchUI();
+            showSuccess('Video added to batch!');
+
+            // Hide success message after 2 seconds
+            setTimeout(() => {
+                document.getElementById('successMsg').classList.add('hidden');
+            }, 2000);
+        }
+
+        function updateBatchUI() {
+            batchElements.batchCount.textContent = batchQueue.length;
+
+            if (batchQueue.length > 0) {
+                batchElements.batchList.style.display = 'block';
+                batchElements.downloadBatch.style.display = 'block';
+
+                batchElements.batchItems.innerHTML = batchQueue.map((item, index) => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 5px; margin-bottom: 5px; border: 1px solid #e0e0e0;">
+                        <div style="flex: 1; overflow: hidden;">
+                            <div style="font-weight: 600; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.title}</div>
+                            <div style="font-size: 0.7rem; color: #666;">@${item.author.username} • ${item.video.resolution}</div>
+                        </div>
+                        <button onclick="removeFromBatch(${index})" style="background: #ff4757; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 0.7rem; cursor: pointer;">✕</button>
+                    </div>
+                `).join('');
+            } else {
+                batchElements.batchList.style.display = 'none';
+                batchElements.downloadBatch.style.display = 'none';
+            }
+        }
+
+        function removeFromBatch(index) {
+            batchQueue.splice(index, 1);
+            updateBatchUI();
+        }
+
+        function clearBatch() {
+            batchQueue = [];
+            updateBatchUI();
+        }
+
+        async function downloadBatch() {
+            if (batchQueue.length === 0) return;
+
+            showSuccess(`Starting batch download of ${batchQueue.length} videos...`);
+
+            for (let i = 0; i < batchQueue.length; i++) {
+                const video = batchQueue[i];
+                const filename = `tiktok_${video.author.username}_${video.title.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.mp4`;
+
+                try {
+                    await downloadFile(video.video.noWatermark, filename, 'video');
+                    const sizeMB = video.video.size ? video.video.size / (1024 * 1024) : 15;
+                    recordSuccessfulDownload(sizeMB);
+                    showSuccess(`Downloaded ${i + 1}/${batchQueue.length}: ${video.title}`);
+                } catch (error) {
+                    showError(`Failed to download: ${video.title}`);
+                }
+
+                // Small delay between downloads
+                if (i < batchQueue.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            showSuccess('Batch download completed!');
+            clearBatch();
+        }
+
+        function showSuccess(message) {
+            let successMsg = document.getElementById('successMsg');
+            if (!successMsg) {
+                successMsg = document.createElement('div');
+                successMsg.id = 'successMsg';
+                successMsg.className = 'alert alert-success';
+                elements.result.insertBefore(successMsg, elements.result.firstChild);
+            }
+            successMsg.textContent = message;
+            successMsg.classList.remove('hidden');
+        }
+
+        // Download statistics functions
+        function loadDownloadStats() {
+            const saved = localStorage.getItem('tiktokDownloadStats');
+            if (saved) {
+                downloadStats = JSON.parse(saved);
+                // Reset daily stats if it's a new day
+                const lastUpdate = new Date(downloadStats.lastUpdate || 0);
+                const today = new Date();
+                if (lastUpdate.toDateString() !== today.toDateString()) {
+                    downloadStats.todayDownloads = 0;
+                    downloadStats.successfulDownloads = 0;
+                    downloadStats.totalSizeDownloaded = 0;
+                }
+            }
+            updateStatsDisplay();
+        }
+
+        function saveDownloadStats() {
+            downloadStats.lastUpdate = new Date().toISOString();
+            localStorage.setItem('tiktokDownloadStats', JSON.stringify(downloadStats));
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('todayDownloads').textContent = downloadStats.todayDownloads;
+            const successRate = downloadStats.todayDownloads > 0 ?
+                Math.round((downloadStats.successfulDownloads / downloadStats.todayDownloads) * 100) : 100;
+            document.getElementById('successRate').textContent = successRate + '%';
+            document.getElementById('totalSize').textContent = formatFileSize(downloadStats.totalSizeDownloaded * 1024 * 1024); // Convert MB to bytes then format
+        }
+
+        function recordSuccessfulDownload(sizeMB = 15) {
+            downloadStats.todayDownloads++;
+            downloadStats.successfulDownloads++;
+            downloadStats.totalSizeDownloaded += sizeMB;
+            saveDownloadStats();
+            updateStatsDisplay();
         }
 
         // Allow Enter key to submit
