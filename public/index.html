@@ -522,7 +522,7 @@
             setLoading(true);
 
             try {
-                const response = await fetch('/.netlify/functions/download', {
+                const response = await fetch('/api/download', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -622,7 +622,7 @@
                 }, 500);
 
                 // Use our proxy to avoid CORS issues
-                const proxyUrl = `/.netlify/functions/proxy?url=${encodeURIComponent(url)}`;
+                const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
 
                 // Create a hidden link and click it
                 const a = document.createElement('a');
