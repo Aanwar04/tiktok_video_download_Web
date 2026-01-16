@@ -28,7 +28,7 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { url } = event.queryStringParameters;
+        const { url, play } = event.queryStringParameters;
 
         if (!url) {
             return {
@@ -59,7 +59,7 @@ exports.handler = async (event, context) => {
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Content-Type': response.headers['content-type'] || 'video/mp4',
-                'Content-Disposition': 'attachment; filename="tiktok_video.mp4"',
+                'Content-Disposition': play === 'true' ? 'inline' : 'attachment; filename="tiktok_video.mp4"',
                 'Cache-Control': 'no-cache'
             },
             body: response.data,
