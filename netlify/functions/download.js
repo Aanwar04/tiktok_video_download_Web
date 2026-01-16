@@ -24,6 +24,25 @@ async function downloadViaTikwm(videoUrl, quality = 'hd') {
     try {
         console.log('🔄 Trying tikwm.com API...');
 
+        // Map quality to API parameters
+        let hdParam = 0;
+        switch (quality) {
+            case 'sd':
+                hdParam = 0; // Standard definition
+                break;
+            case 'hd':
+                hdParam = 1; // High definition
+                break;
+            case 'fhd':
+                hdParam = 2; // Full HD (if supported)
+                break;
+            case '4k':
+                hdParam = 3; // 4K (if supported)
+                break;
+            default:
+                hdParam = 1; // Default to HD
+        }
+
         const response = await axios.get('https://www.tikwm.com/api/', {
             params: {
                 url: videoUrl,
@@ -53,7 +72,7 @@ async function downloadViaTikwm(videoUrl, quality = 'hd') {
                         duration: data.duration || 0,
                         size: data.size || 0,
                         resolution: getResolutionFromQuality(quality),
-                        format: format.toUpperCase(),
+                        format: format?.toUpperCase() || 'MP4',
                         quality: quality
                     },
                     music: {
@@ -109,7 +128,7 @@ async function downloadViaSnaptik(videoUrl) {
                         duration: 0,
                         size: 0,
                         resolution: getResolutionFromQuality(quality),
-                        format: format.toUpperCase(),
+                        format: format?.toUpperCase() || 'MP4',
                         quality: quality
                     },
                     music: {
@@ -164,7 +183,7 @@ async function downloadViaTmate(videoUrl) {
                         duration: 0,
                         size: 0,
                         resolution: getResolutionFromQuality(quality),
-                        format: format.toUpperCase(),
+                        format: format?.toUpperCase() || 'MP4',
                         quality: quality
                     },
                     music: {
