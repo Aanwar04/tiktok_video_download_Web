@@ -44,6 +44,23 @@ A powerful and user-friendly web application that allows you to download TikTok 
    npm start
    ```
 
+## 🚀 Deployment (Render)
+
+This application requires a persistent server (not serverless) because it handles file streams. **Render** is recommended.
+
+1. **Push to GitHub**: Ensure your code is in a GitHub repository.
+2. **Create Web Service**:
+   - Go to Render Dashboard
+   - Click **New +** -> **Web Service**
+   - Connect your repository
+3. **Configure**:
+   - **Build Command**: `npm install`
+   - **Start Command**: `node src/server.js`
+   - **Plan**: Free
+4. **Deploy**: Click Create Web Service.
+
+Render will provide a URL (e.g., `https://your-app.onrender.com`). Since the server also serves the frontend files, you can simply open this URL to use the app.
+
 4. **Open your browser**
    Navigate to `http://localhost:3000`
 

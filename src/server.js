@@ -15,6 +15,14 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static('public'));
 
+// Helper to format file size
+function formatSize(bytes) {
+    if (!bytes) return 'Unknown';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+}
+
 // Method 1: tikwm.com API (Most reliable)
 async function downloadViaTikwm(videoUrl) {
     try {
@@ -45,8 +53,21 @@ async function downloadViaTikwm(videoUrl) {
                     video: {
                         noWatermark: data.hdplay || data.play || data.wmplay,
                         withWatermark: data.wmplay,
-                        cover: data.cover || data.origin_cover,
-                        duration: data.duration || 0
+                        cover: data.origin_cover || data.cover,
+                        duration: data.duration || 0,
+                        size: data.hd_size || data.size || 0,
+                        qualities: [
+                            {
+                                type: 'HD (High)',
+                                url: data.hdplay,
+                                size: formatSize(data.hd_size)
+                            },
+                            {
+                                type: 'Standard (Low)',
+                                url: data.play,
+                                size: formatSize(data.size)
+                            }
+                        ].filter(q => q.url) // Only keep available qualities
                     },
                     music: {
                         title: data.music || data.music_info?.title || 'Original Sound',
@@ -98,7 +119,12 @@ async function downloadViaSnaptik(videoUrl) {
                         noWatermark: response.data.url,
                         withWatermark: response.data.url,
                         cover: response.data.thumbnail || '',
-                        duration: 0
+                        duration: 0,
+                        qualities: [{
+                            type: 'Standard',
+                            url: response.data.url,
+                            size: 'Unknown'
+                        }]
                     },
                     music: {
                         title: 'Original Sound',
@@ -149,7 +175,12 @@ async function downloadViaTmate(videoUrl) {
                         noWatermark: response.data.video_url,
                         withWatermark: response.data.video_url,
                         cover: response.data.thumbnail || '',
-                        duration: 0
+                        duration: 0,
+                        qualities: [{
+                            type: 'Standard',
+                            url: response.data.video_url,
+                            size: 'Unknown'
+                        }]
                     },
                     music: {
                         title: response.data.music || 'Original Sound',
@@ -263,7 +294,7 @@ app.get('/api/test', async (req, res) => {
 // Proxy endpoint to download files (bypasses CORS)
 app.get('/api/proxy', async (req, res) => {
     try {
-        const { url } = req.query;
+        const { url, play } = req.query;
 
         if (!url) {
             return res.status(400).json({ error: 'URL parameter required' });
@@ -283,7 +314,12 @@ app.get('/api/proxy', async (req, res) => {
 
         // Set headers for download
         res.setHeader('Content-Type', response.headers['content-type'] || 'video/mp4');
-        res.setHeader('Content-Disposition', 'attachment; filename="tiktok_video.mp4"');
+
+        if (play === 'true') {
+            res.setHeader('Content-Disposition', 'inline');
+        } else {
+            res.setHeader('Content-Disposition', 'attachment; filename="tiktok_video.mp4"');
+        }
 
         // Pipe the stream
         response.data.pipe(res);
@@ -299,7 +335,11 @@ app.listen(PORT, () => {
     console.log('\n' + '='.repeat(50));
     console.log('🚀 TikTok Downloader Server Started!');
     console.log('='.repeat(50));
-    console.log(`\n📡 Server: http://localhost:${PORT}`);
+    if (process.env.RENDER) {
+        console.log(`\n📡 Server running on Render`);
+    } else {
+        console.log(`\n📡 Server: http://localhost:${PORT}`);
+    }
     console.log(`\n📝 Endpoints:`);
     console.log(`   • POST /api/download - Download videos`);
     console.log(`   • GET  /api/health   - Server status`);
